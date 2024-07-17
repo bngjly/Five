@@ -3,125 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>五子棋游戏</title>
+    <title>俄罗斯方块</title>
     <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+        }
         #gameBoard {
+            width: 300px;
+            height: 600px;
+            background-color: #f0f0f0;
+            border: 2px solid #333;
             display: grid;
-            grid-template-columns: repeat(15, 30px);
-            grid-template-rows: repeat(15, 30px);
-            gap: 1px;
-            background-color: #deb887;
-            border: 2px solid #8b4513;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(20, 1fr);
         }
         .cell {
-            width: 30px;
-            height: 30px;
-            background-color: #deb887;
-            border: 1px solid #8b4513;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
+            border: 1px solid #ccc;
         }
-        .piece {
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
+        .filled {
+            background-color: #333;
         }
-        .black {
-            background-color: black;
+        #score {
+            margin-top: 20px;
+            font-size: 24px;
         }
-        .white {
-            background-color: white;
+        #startButton {
+            margin-top: 20px;
+            font-size: 18px;
+            padding: 10px 20px;
         }
     </style>
 </head>
 <body>
-    <h1>五子棋游戏</h1>
+    <h1>俄罗斯方块</h1>
     <div id="gameBoard"></div>
-    <p id="status"></p>
-    <button id="resetButton">重置游戏</button>
+    <div id="score">分数: 0</div>
+    <button id="startButton">开始游戏</button>
 
     <script>
         const board = document.getElementById('gameBoard');
-        const status = document.getElementById('status');
-        const resetButton = document.getElementById('resetButton');
-        let currentPlayer = 'black';
-        let gameState = Array(15).fill().map(() => Array(15).fill(null));
+        const scoreDisplay = document.getElementById('score');
+        const startButton = document.getElementById('startButton');
+        let score = 0;
+        let gameInterval;
+        let currentPiece;
+        let gameBoard = Array(20).fill().map(() => Array(10).fill(0));
+
+        const pieces = [
+            [[1, 1, 1, 1]],
+            [[1, 1], [1, 1]],
+            [[1, 1, 1], [0, 1, 0]],
+            [[1, 1, 1], [1, 0, 0]],
+            [[1, 1, 1], [0, 0, 1]],
+            [[1, 1, 0], [0, 1, 1]],
+            [[0, 1, 1], [1, 1, 0]]
+        ];
 
         function createBoard() {
-            for (let i = 0; i < 15; i++) {
-                for (let j = 0; j < 15; j++) {
-                    const cell = document.createElement('div');
-                    cell.classList.add('cell');
-                    cell.dataset.row = i;
-                    cell.dataset.col = j;
-                    cell.addEventListener('click', handleCellClick);
-                    board.appendChild(cell);
-                }
+            for (let i = 0; i < 200; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                board.appendChild(cell);
             }
         }
 
-        function handleCellClick(e) {
-            const row = parseInt(e.target.dataset.row);
-            const col = parseInt(e.target.dataset.col);
-
-            if (gameState[row][col] || checkWinner()) return;
-
-            const piece = document.createElement('div');
-            piece.classList.add('piece', currentPlayer);
-            e.target.appendChild(piece);
-
-            gameState[row][col] = currentPlayer;
-
-            if (checkWinner()) {
-                status.textContent = `${currentPlayer === 'black' ? '黑' : '白'}棋胜利！`;
-            } else {
-                currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
-                status.textContent = `当前玩家：${currentPlayer === 'black' ? '黑' : '白'}棋`;
-            }
+        function drawBoard() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach((cell, index) => {
+                const row = Math.floor(index / 10);
+                const col = index % 10;
+                cell.classList.toggle('filled', gameBoard[row][col] === 1);
+            });
         }
 
-        function checkWinner() {
-            const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
-            for (let row = 0; row < 15; row++) {
-                for (let col = 0; col < 15; col++) {
-                    if (gameState[row][col]) {
-                        for (const [dx, dy] of directions) {
-                            let count = 1;
-                            let r = row + dx;
-                            let c = col + dy;
-                            while (r >= 0 && r < 15 && c >= 0 && c < 15 && gameState[r][c] === gameState[row][col]) {
-                                count++;
-                                r += dx;
-                                c += dy;
-                            }
-                            r = row - dx;
-                            c = col - dy;
-                            while (r >= 0 && r < 15 && c >= 0 && c < 15 && gameState[r][c] === gameState[row][col]) {
-                                count++;
-                                r -= dx;
-                                c -= dy;
-                            }
-                            if (count >= 5) return true;
-                        }
+        function createPiece() {
+            const pieceIndex = Math.floor(Math.random() * pieces.length);
+            const piece = pieces[pieceIndex];
+            const pieceWidth = piece[0].length;
+            const startX = Math.floor((10 - pieceWidth) / 2);
+            const startY = 0;
+            return { shape: piece, x: startX, y: startY };
+        }
+
+        function drawPiece() {
+            currentPiece.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        const cellIndex = (currentPiece.y + y) * 10 + (currentPiece.x + x);
+                        const cell = document.querySelectorAll('.cell')[cellIndex];
+                        if (cell) cell.classList.add('filled');
                     }
+                });
+            });
+        }
+
+        function erasePiece() {
+            currentPiece.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        const cellIndex = (currentPiece.y + y) * 10 + (currentPiece.x + x);
+                        const cell = document.querySelectorAll('.cell')[cellIndex];
+                        if (cell) cell.classList.remove('filled');
+                    }
+                });
+            });
+        }
+
+        function canMove(newX, newY) {
+            return currentPiece.shape.every((row, y) => {
+                return row.every((value, x) => {
+                    const boardX = newX + x;
+                    const boardY = newY + y;
+                    return (
+                        value === 0 ||
+                        (boardY < 20 && boardX >= 0 && boardX < 10 && !gameBoard[boardY][boardX])
+                    );
+                });
+            });
+        }
+
+        function movePiece(dx, dy) {
+            erasePiece();
+            if (canMove(currentPiece.x + dx, currentPiece.y + dy)) {
+                currentPiece.x += dx;
+                currentPiece.y += dy;
+            } else if (dy > 0) {
+                placePiece();
+                currentPiece = createPiece();
+                if (!canMove(currentPiece.x, currentPiece.y)) {
+                    endGame();
                 }
             }
-            return false;
+            drawPiece();
         }
 
-        function resetGame() {
-            board.innerHTML = '';
-            gameState = Array(15).fill().map(() => Array(15).fill(null));
-            currentPlayer = 'black';
-            status.textContent = '当前玩家：黑棋';
-            createBoard();
+        function rotatePiece() {
+            erasePiece();
+            const rotated = currentPiece.shape[0].map((_, i) =>
+                currentPiece.shape.map(row => row[i]).reverse()
+            );
+            if (canMove(currentPiece.x, currentPiece.y, rotated)) {
+                currentPiece.shape = rotated;
+            }
+            drawPiece();
         }
 
-        resetButton.addEventListener('click', resetGame);
+        function placePiece() {
+            currentPiece.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        gameBoard[currentPiece.y + y][currentPiece.x + x] = 1;
+                    }
+                });
+            });
+            checkLines();
+        }
+
+        function checkLines() {
+            let linesCleared = 0;
+            for (let y = 19; y >= 0; y--) {
+                if (gameBoard[y].every(cell => cell === 1)) {
+                    gameBoard.splice(y, 1);
+                    gameBoard.unshift(Array(10).fill(0));
+                    linesCleared++;
+                    y++;
+                }
+            }
+            if (linesCleared > 0) {
+                score += linesCleared * 100;
+                scoreDisplay.textContent = `分数: ${score}`;
+            }
+        }
+
+        function endGame() {
+            clearInterval(gameInterval);
+            alert(`游戏结束！你的得分是: ${score}`);
+            startButton.disabled = false;
+        }
+
+        function startGame() {
+            gameBoard = Array(20).fill().map(() => Array(10).fill(0));
+            score = 0;
+            scoreDisplay.textContent = '分数: 0';
+            currentPiece = createPiece();
+            drawBoard();
+            drawPiece();
+            startButton.disabled = true;
+            gameInterval = setInterval(() => movePiece(0, 1), 500);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowLeft':
+                    movePiece(-1, 0);
+                    break;
+                case 'ArrowRight':
+                    movePiece(1, 0);
+                    break;
+                case 'ArrowDown':
+                    movePiece(0, 1);
+                    break;
+                case 'ArrowUp':
+                    rotatePiece();
+                    break;
+            }
+        });
+
+        startButton.addEventListener('click', startGame);
         createBoard();
-        status.textContent = '当前玩家：黑棋';
     </script>
 </body>
 </html>
